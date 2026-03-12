@@ -2,7 +2,7 @@
  * AssetForm - Dynamic form rendered from configuration
  * This is the core CDA component that converts JSON config → working form.
  */
-import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import type { IChangeEvent } from '@rjsf/core';
@@ -49,7 +49,6 @@ const AssetForm: React.FC<AssetFormProps> = ({
   readOnly = false,
 }) => {
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData || {});
-  const deferredFormData = useDeferredValue(formData);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dynamicOptions, setDynamicOptions] = useState<
@@ -69,10 +68,7 @@ const AssetForm: React.FC<AssetFormProps> = ({
   );
 
   // Resolve field states (show/hide/enable/disable)
-  const fieldStates = useMemo(
-    () => resolveFieldStates(config, deferredFormData),
-    [config, deferredFormData],
-  );
+  const fieldStates = useMemo(() => resolveFieldStates(config, formData), [config, formData]);
 
   // Apply field states + dynamic options to schema
   const { schema: resolvedSchema, uiSchema: resolvedUiSchema } = useMemo(() => {
@@ -88,8 +84,14 @@ const AssetForm: React.FC<AssetFormProps> = ({
           fieldKey
         ];
         prop.enum = options.map((o) => o.value);
-        prop.enumNames = options.map((o) => o.label);
       }
+
+      if (!result.uiSchema[fieldKey]) {
+        result.uiSchema[fieldKey] = {};
+      }
+      (result.uiSchema[fieldKey] as Record<string, unknown>)['ui:enumNames'] = options.map(
+        (o) => o.label,
+      );
     }
 
     return result;

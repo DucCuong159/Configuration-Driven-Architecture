@@ -217,8 +217,9 @@ export function applyFieldStatesToSchema(
       if (newSchema.properties && (newSchema.properties as Record<string, unknown>)[key]) {
         const prop = (newSchema.properties as Record<string, Record<string, unknown>>)[key];
         prop.enum = state.options.map((o) => o.value);
-        prop.enumNames = state.options.map((o) => o.label);
       }
+      if (!newUiSchema[key]) newUiSchema[key] = {};
+      (newUiSchema[key] as Record<string, unknown>)['ui:enumNames'] = state.options.map((o) => o.label);
     }
   }
 

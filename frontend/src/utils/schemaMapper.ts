@@ -57,7 +57,6 @@ function mapFieldTypeToJsonSchema(field: FieldConfig): Record<string, unknown> {
       baseSchema.type = 'string';
       if (field.options?.length) {
         baseSchema.enum = field.options.map((o) => o.value);
-        baseSchema.enumNames = field.options.map((o) => o.label);
       }
       break;
 
@@ -65,7 +64,6 @@ function mapFieldTypeToJsonSchema(field: FieldConfig): Record<string, unknown> {
       baseSchema.type = 'string';
       if (field.options?.length) {
         baseSchema.enum = field.options.map((o) => o.value);
-        baseSchema.enumNames = field.options.map((o) => o.label);
       }
       break;
 
@@ -173,6 +171,11 @@ function generateUiOptions(field: FieldConfig): Record<string, unknown> {
   const widget = mapFieldTypeToWidget(field.type);
   if (widget) {
     options['ui:widget'] = widget;
+  }
+
+  // Enum names for dropdowns/radios
+  if ((field.type === 'dropdown' || field.type === 'radio') && field.options?.length) {
+    options['ui:enumNames'] = field.options.map((o) => o.label);
   }
 
   // Placeholder

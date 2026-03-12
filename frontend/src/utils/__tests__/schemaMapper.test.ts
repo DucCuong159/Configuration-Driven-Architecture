@@ -64,7 +64,7 @@ describe('mapConfigToSchema', () => {
 
     const fwSchema = (result.jsonSchema.properties as Record<string, Record<string, unknown>>).framework;
     expect(fwSchema.enum).toEqual(['tf', 'pt']);
-    expect(fwSchema.enumNames).toEqual(['TensorFlow', 'PyTorch']);
+    expect((result.uiSchema.framework as Record<string, unknown>)['ui:enumNames']).toEqual(['TensorFlow', 'PyTorch']);
   });
 
   it('should map checkbox to boolean', () => {
