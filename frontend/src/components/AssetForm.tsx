@@ -2,7 +2,7 @@
  * AssetForm - Dynamic form rendered from configuration
  * This is the core CDA component that converts JSON config → working form.
  */
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useDeferredValue } from 'react';
 import Form from '@rjsf/mui';
 import validator from '@rjsf/validator-ajv8';
 import type { IChangeEvent } from '@rjsf/core';
@@ -49,6 +49,7 @@ const AssetForm: React.FC<AssetFormProps> = ({
   readOnly = false,
 }) => {
   const [formData, setFormData] = useState<Record<string, unknown>>(initialData || {});
+  const deferredFormData = useDeferredValue(formData);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dynamicOptions, setDynamicOptions] = useState<
@@ -58,19 +59,19 @@ const AssetForm: React.FC<AssetFormProps> = ({
   // Generate base schema from config
   const { jsonSchema, uiSchema } = useMemo(
     () => mapConfigToSchema(config, activityType),
-    [config, activityType]
+    [config, activityType],
   );
 
   // Get fields by section for accordion layout
   const fieldsBySection = useMemo(
     () => getFieldsBySection(config, activityType),
-    [config, activityType]
+    [config, activityType],
   );
 
   // Resolve field states (show/hide/enable/disable)
   const fieldStates = useMemo(
-    () => resolveFieldStates(config, formData),
-    [config, formData]
+    () => resolveFieldStates(config, deferredFormData),
+    [config, deferredFormData],
   );
 
   // Apply field states + dynamic options to schema
@@ -83,7 +84,9 @@ const AssetForm: React.FC<AssetFormProps> = ({
         result.schema.properties &&
         (result.schema.properties as Record<string, Record<string, unknown>>)[fieldKey]
       ) {
-        const prop = (result.schema.properties as Record<string, Record<string, unknown>>)[fieldKey];
+        const prop = (result.schema.properties as Record<string, Record<string, unknown>>)[
+          fieldKey
+        ];
         prop.enum = options.map((o) => o.value);
         prop.enumNames = options.map((o) => o.label);
       }
@@ -99,9 +102,7 @@ const AssetForm: React.FC<AssetFormProps> = ({
       setFormData(newData);
 
       // Check if any field changes trigger dynamic option fetching
-      const changedKeys = Object.keys(newData).filter(
-        (key) => newData[key] !== formData[key]
-      );
+      const changedKeys = Object.keys(newData).filter((key) => newData[key] !== formData[key]);
 
       for (const changedKey of changedKeys) {
         const fieldsToFetch = getFieldsNeedingOptionFetch(config, newData, changedKey);
@@ -118,7 +119,7 @@ const AssetForm: React.FC<AssetFormProps> = ({
         }
       }
     },
-    [config, formData]
+    [config, formData],
   );
 
   // Handle form submission
@@ -134,15 +135,17 @@ const AssetForm: React.FC<AssetFormProps> = ({
         setSubmitting(false);
       }
     },
-    [onSubmit]
+    [onSubmit],
   );
 
   // Initialize dynamic options for fields that depend on initial data
   useEffect(() => {
     if (initialData?.input_type && typeof initialData.input_type === 'string') {
-      fetchDynamicOptions('/api/config/input-formats', initialData.input_type as string).then((options) => {
-        setDynamicOptions((prev) => ({ ...prev, input_format: options }));
-      });
+      fetchDynamicOptions('/api/config/input-formats', initialData.input_type as string).then(
+        (options) => {
+          setDynamicOptions((prev) => ({ ...prev, input_format: options }));
+        },
+      );
     }
   }, [initialData]);
 
