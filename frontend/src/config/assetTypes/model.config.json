@@ -1,0 +1,374 @@
+{
+  "type": "model",
+  "label": "AI/ML Model",
+  "icon": "SmartToy",
+  "description": "Machine Learning and AI Model assets including training configurations, deployment details, and performance metrics",
+  "sections": [
+    {
+      "key": "basic_info",
+      "title": "Basic Information",
+      "description": "General model identification and description",
+      "order": 1,
+      "collapsible": true,
+      "defaultCollapsed": false
+    },
+    {
+      "key": "technical_info",
+      "title": "Technical Details",
+      "description": "Model architecture, framework, and training data",
+      "order": 2,
+      "collapsible": true,
+      "defaultCollapsed": false
+    },
+    {
+      "key": "deployment",
+      "title": "Deployment & Access",
+      "description": "Model hosting, URLs, and access configuration",
+      "order": 3,
+      "collapsible": true,
+      "defaultCollapsed": true
+    },
+    {
+      "key": "metadata",
+      "title": "Metadata & Tags",
+      "description": "Additional metadata and categorization",
+      "order": 4,
+      "collapsible": true,
+      "defaultCollapsed": true
+    }
+  ],
+  "fields": [
+    {
+      "key": "name",
+      "label": "Model Name",
+      "type": "text",
+      "placeholder": "Enter model name (e.g., GPT-4o-mini)",
+      "helpText": "A unique, descriptive name for this model",
+      "required": true,
+      "section": "basic_info",
+      "order": 1,
+      "colSpan": 6,
+      "validations": [
+        { "type": "required", "message": "Model name is required" },
+        { "type": "minLength", "value": 3, "message": "Name must be at least 3 characters" },
+        { "type": "maxLength", "value": 100, "message": "Name must not exceed 100 characters" }
+      ]
+    },
+    {
+      "key": "version",
+      "label": "Version",
+      "type": "text",
+      "placeholder": "e.g., 1.0.0",
+      "required": true,
+      "section": "basic_info",
+      "order": 2,
+      "colSpan": 3,
+      "validations": [
+        { "type": "required", "message": "Version is required" },
+        { "type": "pattern", "value": "^\\d+\\.\\d+\\.\\d+$", "message": "Version must follow semver format (e.g., 1.0.0)" }
+      ]
+    },
+    {
+      "key": "status_tag",
+      "label": "Status",
+      "type": "dropdown",
+      "section": "basic_info",
+      "order": 3,
+      "colSpan": 3,
+      "defaultValue": "experimental",
+      "options": [
+        { "label": "Experimental", "value": "experimental" },
+        { "label": "Staging", "value": "staging" },
+        { "label": "Production", "value": "production" },
+        { "label": "Deprecated", "value": "deprecated" }
+      ]
+    },
+    {
+      "key": "description",
+      "label": "Description",
+      "type": "textarea",
+      "placeholder": "Describe the model's purpose, capabilities, and intended use cases",
+      "section": "basic_info",
+      "order": 4,
+      "colSpan": 12,
+      "validations": [
+        { "type": "maxLength", "value": 2000, "message": "Description must not exceed 2000 characters" }
+      ]
+    },
+    {
+      "key": "created_date",
+      "label": "Created Date",
+      "type": "date",
+      "section": "basic_info",
+      "order": 5,
+      "colSpan": 6
+    },
+    {
+      "key": "valid_period",
+      "label": "Valid Period",
+      "type": "date-range",
+      "helpText": "The period during which this model version is considered valid",
+      "section": "basic_info",
+      "order": 6,
+      "colSpan": 6
+    },
+    {
+      "key": "framework",
+      "label": "Framework",
+      "type": "dropdown",
+      "required": true,
+      "section": "technical_info",
+      "order": 1,
+      "colSpan": 4,
+      "options": [
+        { "label": "TensorFlow", "value": "tensorflow" },
+        { "label": "PyTorch", "value": "pytorch" },
+        { "label": "JAX", "value": "jax" },
+        { "label": "Scikit-learn", "value": "sklearn" },
+        { "label": "ONNX", "value": "onnx" },
+        { "label": "Other", "value": "other" }
+      ],
+      "validations": [
+        { "type": "required", "message": "Framework is required" }
+      ]
+    },
+    {
+      "key": "input_type",
+      "label": "Input Type",
+      "type": "dropdown",
+      "required": true,
+      "section": "technical_info",
+      "order": 2,
+      "colSpan": 4,
+      "options": [
+        { "label": "Image", "value": "image" },
+        { "label": "Text", "value": "text" },
+        { "label": "Audio", "value": "audio" },
+        { "label": "Video", "value": "video" },
+        { "label": "Tabular", "value": "tabular" },
+        { "label": "Multimodal", "value": "multimodal" }
+      ],
+      "validations": [
+        { "type": "required", "message": "Input type is required" }
+      ]
+    },
+    {
+      "key": "input_format",
+      "label": "Input Format",
+      "type": "dropdown",
+      "section": "technical_info",
+      "order": 3,
+      "colSpan": 4,
+      "helpText": "Format is dynamically determined based on Input Type",
+      "options": [],
+      "dependencies": [
+        {
+          "sourceField": "input_type",
+          "condition": "not_empty",
+          "value": null,
+          "action": "fetch_options",
+          "apiEndpoint": "/api/config/input-formats"
+        }
+      ]
+    },
+    {
+      "key": "model_type",
+      "label": "Model Type",
+      "type": "radio",
+      "section": "technical_info",
+      "order": 4,
+      "colSpan": 6,
+      "options": [
+        { "label": "Classification", "value": "classification" },
+        { "label": "Regression", "value": "regression" },
+        { "label": "Generation", "value": "generation" },
+        { "label": "Detection", "value": "detection" },
+        { "label": "Segmentation", "value": "segmentation" }
+      ]
+    },
+    {
+      "key": "is_pretrained",
+      "label": "Is Pre-trained Model?",
+      "type": "checkbox",
+      "section": "technical_info",
+      "order": 5,
+      "colSpan": 6,
+      "defaultValue": false
+    },
+    {
+      "key": "pretrained_source",
+      "label": "Pre-trained Source",
+      "type": "text",
+      "placeholder": "e.g., HuggingFace, TensorFlow Hub",
+      "section": "technical_info",
+      "order": 6,
+      "colSpan": 6,
+      "dependencies": [
+        {
+          "sourceField": "is_pretrained",
+          "condition": "equals",
+          "value": true,
+          "action": "show"
+        }
+      ]
+    },
+    {
+      "key": "training_datasets",
+      "label": "Training Datasets",
+      "type": "asset_relation",
+      "required": true,
+      "section": "technical_info",
+      "order": 7,
+      "colSpan": 12,
+      "relatedAssetType": "dataset",
+      "multiple": true,
+      "helpText": "Select one or more datasets used to train this model",
+      "validations": [
+        { "type": "required", "message": "At least one training dataset is required" }
+      ]
+    },
+    {
+      "key": "model_url",
+      "label": "Model URL",
+      "type": "asset_url",
+      "section": "deployment",
+      "order": 1,
+      "colSpan": 12,
+      "showInternalCheckbox": true,
+      "placeholder": "https://storage.example.com/models/my-model",
+      "helpText": "URL where the model artifact is stored. Check 'Internal' if hosted on company infrastructure"
+    },
+    {
+      "key": "model_size",
+      "label": "Model Size (MB)",
+      "type": "number",
+      "section": "deployment",
+      "order": 2,
+      "colSpan": 4,
+      "min": 0,
+      "placeholder": "e.g., 512"
+    },
+    {
+      "key": "inference_time",
+      "label": "Avg Inference Time (ms)",
+      "type": "number",
+      "section": "deployment",
+      "order": 3,
+      "colSpan": 4,
+      "min": 0,
+      "placeholder": "e.g., 150"
+    },
+    {
+      "key": "accuracy",
+      "label": "Accuracy (%)",
+      "type": "number",
+      "section": "deployment",
+      "order": 4,
+      "colSpan": 4,
+      "min": 0,
+      "max": 100,
+      "placeholder": "e.g., 95.5"
+    },
+    {
+      "key": "tags",
+      "label": "Tags",
+      "type": "tags",
+      "section": "metadata",
+      "order": 1,
+      "colSpan": 12,
+      "placeholder": "Type a tag and press Enter",
+      "helpText": "Add tags to categorize this model"
+    },
+    {
+      "key": "owner_email",
+      "label": "Owner Email",
+      "type": "email",
+      "section": "metadata",
+      "order": 2,
+      "colSpan": 6,
+      "required": true,
+      "validations": [
+        { "type": "required", "message": "Owner email is required" },
+        { "type": "email", "message": "Must be a valid email address" }
+      ]
+    },
+    {
+      "key": "is_public",
+      "label": "Publicly Accessible",
+      "type": "switch",
+      "section": "metadata",
+      "order": 3,
+      "colSpan": 6,
+      "defaultValue": false,
+      "helpText": "Whether this model is accessible to external users"
+    }
+  ],
+  "reviewSteps": [
+    {
+      "stepNumber": 1,
+      "title": "Basic Information Review",
+      "description": "Verify model name, version, description and basic metadata",
+      "reviewerRole": "admin",
+      "fields": ["name", "version", "status_tag", "description", "created_date", "valid_period"],
+      "requiredFields": ["name", "version"]
+    },
+    {
+      "stepNumber": 2,
+      "title": "Technical Details Review",
+      "description": "Verify framework, input/output specifications, and training data",
+      "reviewerRole": "ml_engineer",
+      "fields": ["framework", "input_type", "input_format", "model_type", "is_pretrained", "pretrained_source", "training_datasets"],
+      "requiredFields": ["framework", "input_type", "training_datasets"]
+    },
+    {
+      "stepNumber": 3,
+      "title": "Final Approval",
+      "description": "Final review and approval for publishing",
+      "reviewerRole": "admin",
+      "fields": ["model_url", "model_size", "inference_time", "accuracy", "tags", "owner_email", "is_public"],
+      "requiredFields": ["model_url", "owner_email"]
+    }
+  ],
+  "activities": [
+    {
+      "type": "registration",
+      "label": "Model Registration",
+      "description": "Register a new AI/ML model into the asset library",
+      "requiredFields": ["name", "version", "framework", "training_datasets", "owner_email"]
+    },
+    {
+      "type": "sharing",
+      "label": "Model Sharing",
+      "description": "Share an existing model with other teams",
+      "requiredFields": ["name"],
+      "visibleFields": ["name", "description", "model_url", "tags", "is_public"]
+    },
+    {
+      "type": "purchase",
+      "label": "Model Purchase",
+      "description": "Request purchase of an external model",
+      "requiredFields": ["name", "model_url"],
+      "visibleFields": ["name", "description", "model_url", "model_size", "framework"]
+    },
+    {
+      "type": "update",
+      "label": "Model Update",
+      "description": "Update an existing model's information",
+      "requiredFields": ["name", "version"]
+    },
+    {
+      "type": "deprecation",
+      "label": "Model Deprecation",
+      "description": "Mark a model as deprecated",
+      "requiredFields": ["name"],
+      "visibleFields": ["name", "version", "description", "status_tag"]
+    },
+    {
+      "type": "transfer",
+      "label": "Model Transfer",
+      "description": "Transfer model ownership to another team",
+      "requiredFields": ["name", "owner_email"],
+      "visibleFields": ["name", "owner_email", "description"]
+    }
+  ]
+}

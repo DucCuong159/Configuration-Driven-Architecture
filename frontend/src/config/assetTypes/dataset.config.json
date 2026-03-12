@@ -1,0 +1,305 @@
+{
+  "type": "dataset",
+  "label": "Dataset",
+  "icon": "Storage",
+  "description": "Data assets including structured, unstructured, and streaming datasets",
+  "sections": [
+    {
+      "key": "basic_info",
+      "title": "Basic Information",
+      "description": "General dataset identification",
+      "order": 1,
+      "collapsible": true,
+      "defaultCollapsed": false
+    },
+    {
+      "key": "data_details",
+      "title": "Data Details",
+      "description": "Format, size, and structure information",
+      "order": 2,
+      "collapsible": true,
+      "defaultCollapsed": false
+    },
+    {
+      "key": "access",
+      "title": "Access & Storage",
+      "description": "Data source URL and access configurations",
+      "order": 3,
+      "collapsible": true,
+      "defaultCollapsed": true
+    },
+    {
+      "key": "relations",
+      "title": "Relations & Metadata",
+      "description": "Related assets and metadata",
+      "order": 4,
+      "collapsible": true,
+      "defaultCollapsed": true
+    }
+  ],
+  "fields": [
+    {
+      "key": "name",
+      "label": "Dataset Name",
+      "type": "text",
+      "placeholder": "Enter dataset name",
+      "required": true,
+      "section": "basic_info",
+      "order": 1,
+      "colSpan": 6,
+      "validations": [
+        { "type": "required", "message": "Dataset name is required" },
+        { "type": "minLength", "value": 3, "message": "Name must be at least 3 characters" }
+      ]
+    },
+    {
+      "key": "version",
+      "label": "Version",
+      "type": "text",
+      "placeholder": "e.g., 1.0.0",
+      "required": true,
+      "section": "basic_info",
+      "order": 2,
+      "colSpan": 3,
+      "validations": [
+        { "type": "required", "message": "Version is required" }
+      ]
+    },
+    {
+      "key": "data_category",
+      "label": "Data Category",
+      "type": "dropdown",
+      "section": "basic_info",
+      "order": 3,
+      "colSpan": 3,
+      "options": [
+        { "label": "Training Data", "value": "training" },
+        { "label": "Validation Data", "value": "validation" },
+        { "label": "Test Data", "value": "test" },
+        { "label": "Reference Data", "value": "reference" },
+        { "label": "Raw Data", "value": "raw" }
+      ]
+    },
+    {
+      "key": "description",
+      "label": "Description",
+      "type": "textarea",
+      "placeholder": "Describe the dataset contents, source, and intended usage",
+      "section": "basic_info",
+      "order": 4,
+      "colSpan": 12
+    },
+    {
+      "key": "format",
+      "label": "Data Format",
+      "type": "dropdown",
+      "required": true,
+      "section": "data_details",
+      "order": 1,
+      "colSpan": 4,
+      "options": [
+        { "label": "CSV", "value": "csv" },
+        { "label": "JSON", "value": "json" },
+        { "label": "Parquet", "value": "parquet" },
+        { "label": "HDF5", "value": "hdf5" },
+        { "label": "TFRecord", "value": "tfrecord" },
+        { "label": "Image Folder", "value": "image_folder" },
+        { "label": "SQL Database", "value": "sql" },
+        { "label": "Other", "value": "other" }
+      ],
+      "validations": [
+        { "type": "required", "message": "Data format is required" }
+      ]
+    },
+    {
+      "key": "size_mb",
+      "label": "Size (MB)",
+      "type": "number",
+      "section": "data_details",
+      "order": 2,
+      "colSpan": 4,
+      "min": 0,
+      "placeholder": "e.g., 1024"
+    },
+    {
+      "key": "row_count",
+      "label": "Number of Rows",
+      "type": "number",
+      "section": "data_details",
+      "order": 3,
+      "colSpan": 4,
+      "min": 0,
+      "placeholder": "e.g., 1000000"
+    },
+    {
+      "key": "column_count",
+      "label": "Number of Columns",
+      "type": "number",
+      "section": "data_details",
+      "order": 4,
+      "colSpan": 4,
+      "min": 0
+    },
+    {
+      "key": "has_labels",
+      "label": "Contains Labels?",
+      "type": "checkbox",
+      "section": "data_details",
+      "order": 5,
+      "colSpan": 4,
+      "defaultValue": false
+    },
+    {
+      "key": "label_type",
+      "label": "Label Type",
+      "type": "dropdown",
+      "section": "data_details",
+      "order": 6,
+      "colSpan": 4,
+      "options": [
+        { "label": "Binary", "value": "binary" },
+        { "label": "Multi-class", "value": "multiclass" },
+        { "label": "Multi-label", "value": "multilabel" },
+        { "label": "Bounding Box", "value": "bbox" },
+        { "label": "Segmentation Mask", "value": "segmentation" }
+      ],
+      "dependencies": [
+        {
+          "sourceField": "has_labels",
+          "condition": "equals",
+          "value": true,
+          "action": "show"
+        }
+      ]
+    },
+    {
+      "key": "collection_period",
+      "label": "Data Collection Period",
+      "type": "date-range",
+      "section": "data_details",
+      "order": 7,
+      "colSpan": 12
+    },
+    {
+      "key": "source_url",
+      "label": "Source URL",
+      "type": "asset_url",
+      "section": "access",
+      "order": 1,
+      "colSpan": 12,
+      "showInternalCheckbox": true,
+      "placeholder": "https://storage.example.com/datasets/my-dataset"
+    },
+    {
+      "key": "access_level",
+      "label": "Access Level",
+      "type": "radio",
+      "section": "access",
+      "order": 2,
+      "colSpan": 6,
+      "options": [
+        { "label": "Public", "value": "public" },
+        { "label": "Internal Only", "value": "internal" },
+        { "label": "Restricted", "value": "restricted" },
+        { "label": "Confidential", "value": "confidential" }
+      ]
+    },
+    {
+      "key": "requires_nda",
+      "label": "Requires NDA?",
+      "type": "switch",
+      "section": "access",
+      "order": 3,
+      "colSpan": 6,
+      "defaultValue": false,
+      "dependencies": [
+        {
+          "sourceField": "access_level",
+          "condition": "in",
+          "value": ["restricted", "confidential"],
+          "action": "show"
+        }
+      ]
+    },
+    {
+      "key": "related_models",
+      "label": "Related Models",
+      "type": "asset_relation",
+      "section": "relations",
+      "order": 1,
+      "colSpan": 12,
+      "relatedAssetType": "model",
+      "multiple": true,
+      "helpText": "Select models that use this dataset"
+    },
+    {
+      "key": "tags",
+      "label": "Tags",
+      "type": "tags",
+      "section": "relations",
+      "order": 2,
+      "colSpan": 12,
+      "placeholder": "Type a tag and press Enter"
+    },
+    {
+      "key": "owner_email",
+      "label": "Owner Email",
+      "type": "email",
+      "section": "relations",
+      "order": 3,
+      "colSpan": 6,
+      "required": true,
+      "validations": [
+        { "type": "required", "message": "Owner email is required" },
+        { "type": "email", "message": "Must be a valid email address" }
+      ]
+    }
+  ],
+  "reviewSteps": [
+    {
+      "stepNumber": 1,
+      "title": "Basic Information Review",
+      "description": "Verify dataset name, description, and category",
+      "reviewerRole": "admin",
+      "fields": ["name", "version", "data_category", "description"],
+      "requiredFields": ["name", "version"]
+    },
+    {
+      "stepNumber": 2,
+      "title": "Data Quality Review",
+      "description": "Review data format, size, and quality metrics",
+      "reviewerRole": "data_engineer",
+      "fields": ["format", "size_mb", "row_count", "column_count", "has_labels", "label_type", "collection_period"],
+      "requiredFields": ["format"]
+    },
+    {
+      "stepNumber": 3,
+      "title": "Final Approval",
+      "description": "Final review and publication approval",
+      "reviewerRole": "admin",
+      "fields": ["source_url", "access_level", "requires_nda", "related_models", "tags", "owner_email"],
+      "requiredFields": ["source_url", "owner_email"]
+    }
+  ],
+  "activities": [
+    {
+      "type": "registration",
+      "label": "Dataset Registration",
+      "description": "Register a new dataset into the asset library",
+      "requiredFields": ["name", "version", "format", "owner_email"]
+    },
+    {
+      "type": "sharing",
+      "label": "Dataset Sharing",
+      "description": "Share a dataset with other teams",
+      "requiredFields": ["name"],
+      "visibleFields": ["name", "description", "source_url", "access_level", "tags"]
+    },
+    {
+      "type": "update",
+      "label": "Dataset Update",
+      "description": "Update dataset information",
+      "requiredFields": ["name", "version"]
+    }
+  ]
+}
