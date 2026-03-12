@@ -36,7 +36,6 @@ interface AssetFormProps {
   activityType?: ActivityType;
   initialData?: Record<string, unknown>;
   onSubmit: (formData: Record<string, unknown>) => Promise<void>;
-  onSaveDraft?: (formData: Record<string, unknown>) => void;
   submitLabel?: string;
   readOnly?: boolean;
 }
@@ -46,7 +45,6 @@ const AssetForm: React.FC<AssetFormProps> = ({
   activityType,
   initialData,
   onSubmit,
-  onSaveDraft,
   submitLabel = 'Submit',
   readOnly = false,
 }) => {
@@ -175,16 +173,6 @@ const AssetForm: React.FC<AssetFormProps> = ({
         {/* Custom submit area */}
         {!readOnly && (
           <Box sx={{ display: 'flex', gap: 2, mt: 3, justifyContent: 'flex-end' }}>
-            {onSaveDraft && (
-              <Button
-                variant="outlined"
-                startIcon={<SaveIcon />}
-                onClick={() => onSaveDraft(formData)}
-                disabled={submitting}
-              >
-                Save Draft
-              </Button>
-            )}
             <Button
               type="submit"
               variant="contained"

@@ -94,7 +94,8 @@ const Layout: React.FC = () => {
                 key={item.path}
                 selected={isActive}
                 onClick={() => navigate(item.path)}
-                sx={{ mb: 0.5,
+                sx={{
+                  mb: 0.5,
                   '& .MuiListItemIcon-root': {
                     color: isActive ? 'primary.main' : 'text.secondary',
                     minWidth: 40,
@@ -117,10 +118,18 @@ const Layout: React.FC = () => {
         {/* Bottom */}
         <Divider sx={{ mx: 2 }} />
         <Box sx={{ p: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', textAlign: 'center' }}
+          >
             Config-Driven Architecture
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', fontSize: '0.65rem' }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: 'block', textAlign: 'center', fontSize: '0.65rem' }}
+          >
             v1.0.0
           </Typography>
         </Box>

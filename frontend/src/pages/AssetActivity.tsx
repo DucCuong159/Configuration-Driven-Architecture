@@ -103,18 +103,6 @@ const AssetActivity: React.FC = () => {
     [selectedAssetType, selectedActivity, selectedConfig, createActivity, submitActivity, createReview]
   );
 
-  const handleSaveDraft = useCallback(
-    async (formData: Record<string, unknown>) => {
-      if (!selectedAssetType || !selectedActivity) return;
-      await createActivity({
-        assetType: selectedAssetType,
-        activityType: selectedActivity,
-        formData,
-      });
-    },
-    [selectedAssetType, selectedActivity, createActivity]
-  );
-
   // Go back
   const handleBack = () => {
     if (activeStep === 1) {
@@ -267,7 +255,6 @@ const AssetActivity: React.FC = () => {
             config={selectedConfig}
             activityType={selectedActivity}
             onSubmit={handleFormSubmit}
-            onSaveDraft={handleSaveDraft}
             submitLabel="Submit for Review"
           />
         </Paper>
