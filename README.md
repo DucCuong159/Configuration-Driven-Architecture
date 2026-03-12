@@ -50,6 +50,8 @@ cd ../frontend && npm run dev
 CDA/
 ├── cda.md                          # Complete specification
 ├── frontend/
+│   ├── .clinerules/                # Cline AI development rules
+│   ├── memory-bank/                # AI pair programming context
 │   ├── src/
 │   │   ├── api/                    # API client + endpoint functions
 │   │   ├── components/
@@ -103,6 +105,11 @@ See [docs/ADDING_ASSETS.md](docs/ADDING_ASSETS.md) for the full guide. Summary:
 
 ## Documentation
 
+### Usage & Setup
 - [Architecture](docs/ARCHITECTURE.md) — System design and data flow
 - [Setup Guide](docs/SETUP.md) — Detailed development setup
 - [Adding Assets](docs/ADDING_ASSETS.md) — Step-by-step guide for new asset types
+
+### AI Pair Programming Rules
+- `.clinerules/` — 11 rule chapters covering architecture, API, state, and UI.
+- `memory-bank/` — Current task context and historical decisions logic.
