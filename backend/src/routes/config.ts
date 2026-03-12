@@ -70,7 +70,8 @@ router.get('/asset-types/:type', (req, res) => {
  * Query: ?inputType=image
  */
 router.get('/input-formats', (req, res) => {
-  const inputType = req.query.inputType as string;
+  // Support both 'inputType' (explicit) and 'value' (from generic CDA frontend resolver)
+  const inputType = (req.query.inputType || req.query.value) as string;
 
   if (!inputType) {
     return res.json({

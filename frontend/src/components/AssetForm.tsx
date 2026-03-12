@@ -143,7 +143,7 @@ const AssetForm: React.FC<AssetFormProps> = ({
   // Initialize dynamic options for fields that depend on initial data
   useEffect(() => {
     if (initialData?.input_type && typeof initialData.input_type === 'string') {
-      fetchDynamicOptions('/api/config/input-formats', initialData.input_type as string).then(
+      fetchDynamicOptions('/config/input-formats', initialData.input_type as string).then(
         (options) => {
           setDynamicOptions((prev) => ({ ...prev, input_format: options }));
         },

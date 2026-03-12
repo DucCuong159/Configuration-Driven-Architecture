@@ -167,7 +167,7 @@
           "condition": "not_empty",
           "value": null,
           "action": "fetch_options",
-          "apiEndpoint": "/api/config/input-formats"
+          "apiEndpoint": "/config/input-formats"
         }
       ]
     },
