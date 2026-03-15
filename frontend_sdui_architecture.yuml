@@ -1,0 +1,22 @@
+// {type:class}
+// {direction:topDown}
+[JSON Schema Payload (from Server)]-fetch>[Network & Cache Layer]
+[Network & Cache Layer]-payload>[Parser & Mapper]
+
+[Parser & Mapper]-init variables>[State Management (Zustand/Redux)]
+[Parser & Mapper]-extract layout>[Execution Engine (Recursive Renderer)]
+[Parser & Mapper]-extract rules>[Rule Engine (Evaluator)]
+
+[State Management (Zustand/Redux)]-subscribe/bind>[Execution Engine (Recursive Renderer)]
+[Rule Engine (Evaluator)]-compute dynamic styles/visibility>[State Management (Zustand/Redux)]
+
+[Execution Engine (Recursive Renderer)]-lookup component>[Component Registry]
+[Component Registry]^[Core UI Components (Button, Text, Input)]
+[Component Registry]^[Custom Widgets (Chart, Video Player)]
+
+[Execution Engine (Recursive Renderer)]-render>[React Virtual DOM]
+[React Virtual DOM]-user interactions (click, type)>[Action Resolver]
+
+[Action Resolver]-mutate state>[State Management (Zustand/Redux)]
+[Action Resolver]-trigger evaluation>[Rule Engine (Evaluator)]
+[Action Resolver]-fire network request>[Network & Cache Layer]
