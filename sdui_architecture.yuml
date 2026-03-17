@@ -1,0 +1,16 @@
+// {type: class}
+// {direction: topDown}
+// {generate: true}
+
+[Backend API]->[Layer 1: Network & Cache]
+[Layer 1: Network & Cache]->[Layer 2: Parser & Validator]
+[Layer 2: Parser & Validator]->[Layer 3: State & Rule Engine]
+[Layer 2: Parser & Validator]->[Layer 4: Rendering Engine]
+[Layer 2: Parser & Validator]->[Layer 5: Action Resolver]
+
+[Layer 3: State & Rule Engine]-[note: Store Redux]
+[Layer 3: State & Rule Engine]->[Layer 4: Rendering Engine]
+
+[User Browser]->[Layer 5: Action Resolver]
+[Layer 5: Action Resolver]->[Layer 3: State & Rule Engine]
+[Layer 5: Action Resolver]->[Backend API]

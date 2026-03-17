@@ -1,214 +1,596 @@
-# CDA Frontend Architecture — Tài liệu Trình bày Team Lead
-
-## 1. Mục tiêu
-
-Tài liệu này đề xuất thay đổi cấu trúc dự án Frontend ReactJS hiện tại, chuyển dịch từ việc **hard-code các màn hình Quản lý Asset (View & Edit)** sang kiến trúc **CDA (Configuration Driven Architecture)** linh hoạt hơn.
-
-**Tech stack hiện tại:** ReactJS · TypeScript · Redux · Jest · React Testing Library.
+# CDA Frontend Architecture
 
 ---
 
-## 2. CDA là gì? (SDUI vs CDUI)
+## 1. Bối cảnh & Động lực
 
-CDA là kiến trúc sử dụng các file cấu hình (JSON/YAML) để quyết định việc hiển thị thay vì viết mã UI tĩnh. CDA có 3 nhánh chính, dự án chúng ta sẽ tập trung vào nhóm **CDUI**:
+Hệ thống hiện tại triển khai các màn hình quản lý Asset (View & Edit) dưới dạng **hard-coded React components**. Mỗi Asset type mới (Model, Dataset, Service...) đòi hỏi một vòng phát triển đầy đủ: thiết kế UI, implementation, review, test và deploy. Cách tiếp cận này tạo ra gánh nặng technical debt khi số lượng Asset types tăng trưởng và yêu cầu thay đổi cấu trúc form liên tục.
 
-| Đặc điểm | CDUI (Config-Driven UI) | SDUI (Server-Driven UI) |
-|---|---|---|
-| **Ví dụ** | Form Builder, CMS Dashboard, **Asset Forms của team ta**. | Màn hình Home của Airbnb, Shopify, Spotify. |
-| **Vị trí Config** | Quản lý bởi Dev/Ops, file JSON có thể đi liền với code Frontend hoặc fetch 1 lần từ CDN. | Sinh ra động từ phía Server, phụ thuộc vào user segment, A/B testing. |
-| **Lợi ích chính** | Thêm mới một Asset Form (Model, Dataset...) mà không cần dev lại UI, chỉ thêm JSON. | Tự do thay đổi bố cục màn hình ngay lập tức không cần chờ Approval từ App Store (Mobile). |
-| **Sự phù hợp** | ✅ **Phù hợp nhất với bài toán hiện tại.** Các Form Asset có tính cấu trúc cao. | ❌ Hơi cồng kềnh cho giai đoạn 1, phù hợp định hướng dài hạn. |
-
-*(Nhánh thứ 3 là CDD - Config-Driven Development, thường dùng cho cấu hình DevOps/Infra pipeline, không nằm trong phạm vi giao diện).*
+Tài liệu này đề xuất migration sang kiến trúc **CDA (Configuration Driven Architecture)**, trong đó UI được định nghĩa qua JSON schema thay vì mã nguồn tĩnh. Mục tiêu là giảm chi phí phát triển tính năng mới và tăng khả năng tái sử dụng của rendering engine.
 
 ---
 
-## 3. Kiến trúc Hệ thống (5 Lớp Cốt lõi)
+## 2. Phân loại Kiến trúc: CDUI vs SDUI
 
-Để biến file JSON thành màn hình tương tác, hệ thống cần xử lý qua một dây chuyền 5 lớp (Layers). Dây chuyền này chạy 1 chiều từ lấy dữ liệu đến khi User tương tác:
+CDA bao gồm hai mô hình triển khai với đặc tính khác nhau:
 
-1. **Lớp 1: Network & Cache (Tải và Lưu trữ)**
-   * *Nhiệm vụ:* Kéo file cấu hình JSON từ Server về. Bảo đảm UI không bị giật lag nếu đường truyền chậm.
-   * *Cơ chế:* Nếu JSON không thay đổi trên Server, tận dụng cơ chế Cache (ETag/LocalStorage) để đọc lên lập tức thay vì tải lại.
+| Tiêu chí                   | CDUI (Config-Driven UI)                                         | SDUI (Server-Driven UI)                                                |
+| -------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Nguồn gốc config**       | Dev/Ops quản lý, phân phối qua CDN hoặc bundled cùng client     | Server sinh động theo context request (user segment, A/B test, device) |
+| **Tần suất thay đổi**      | Theo release cycle, cần deploy khi cập nhật                     | Real-time, không cần client deploy                                     |
+| **Độ phức tạp triển khai** | Thấp — client tự xử lý toàn bộ                                  | Cao — yêu cầu schema API contract giữa server và client                |
+| **Ứng dụng phù hợp**       | Form builder, CMS, **Asset Management Forms**                   | Airbnb home feed, Shopify storefront, Spotify Now Playing              |
+| **Phù hợp dự án hiện tại** | ✅ Phù hợp giai đoạn 1 — cấu trúc form Asset có schema xác định | 🔄 Định hướng dài hạn khi Server cần kiểm soát UI theo business rules  |
 
-2. **Lớp 2: Schema Parser (Trình Phân tích)**
-   * *Nhiệm vụ:* Đọc toàn bộ nội dung file JSON và kiểm tra tính hợp lệ (Validate bằng AJV). Sau đó "thái" JSON ra làm 3 phần: (1) Cấu trúc giao diện [Layout], (2) Các biến tạm đang có [Variables], (3) Các quy tắc rẽ nhánh [Rules].
-
-3. **Lớp 3: State & Rule Engine (Lưu trữ Trạng thái & Tính toán Logic)**
-   * *Nhiệm vụ:* Lưu dữ liệu User đang gõ tạm vào **Redux Store**. Đồng thời, **Rule Engine** sẽ chạy nền, liên tục đánh giá các quy tắc (Ví dụ: `age > 18` thì cho hiện ô nghề nghiệp) bằng thư viện toán tử học (như JsonLogic).
-
-4. **Lớp 4: Rendering Engine (Động cơ Hiển thị)**
-   * *Nhiệm vụ:* Cầm kết quả Cấu trúc của Lớp 2 và Trạng thái của Lớp 3 để vẽ ra DOM thực tế. Nó đóng vai trò "người đi chợ", thấy config ghi `type="button"`, nó chạy vào `Component Registry` (Kho chứa UI) lấy `<Button />` ra xài.
-
-5. **Lớp 5: Action Resolver (Bộ Xử lý Tương tác)**
-   * *Nhiệm vụ:* Khi User bấm "Lưu", hay cuộn chuột, Lớp này bắt lấy sự kiện (Event), phân dịch nó thành các mảnh lệnh (Action). Ví dụ: `[ { action: "VALIDATE" }, { action: "API_CALL", url: "/abc" } ]` và điều phối đi thực thi.
+**Quyết định thiết kế:** Giai đoạn đầu áp dụng **CDUI** — config tĩnh, quản lý bởi team, fetch một lần và cache phía client. Kiến trúc được thiết kế để có thể chuyển tiếp sang SDUI mà không cần refactor engine.
 
 ---
 
-## 4. Cấu trúc Thư mục Đề xuất
+## 3. Kiến trúc Hệ thống — 5-Layer Pipeline
 
-Kiến trúc thư mục được chia thành **4 khối chức năng phân tách trách nhiệm chặt chẽ**:
+Hệ thống được tổ chức thành 5 lớp xử lý tuần tự, theo nguyên tắc **single-responsibility** và **unidirectional data flow**. Mỗi lớp có interface rõ ràng, không phụ thuộc ngược.
 
-```text
-src/
-├── core/               # Khối 1: Trái tim Hệ thống (Core Engine)
-│                       # → Tuyệt đối không chứa logic nghiệp vụ đặc thù dự án.
-│                       # → Chứa Renderer, Parser, Action Resolver, Rule Engine.
-│ 
-├── widgets/            # Khối 2: Kho Gạch Xây Hình (UI Components)
-│                       # → Đây là các "Dumb Components" (TextInput, Button...).
-│                       # → Chỉ nhận Props hiển thị và phát ra HTML Events. Không tự call API.
-│ 
-├── store/              # Khối 3: Não Bộ Trạng Thái (Redux State)
-│                       # → Nơi cấu hình Redux Store (cdaSlice.ts). 
-│                       # → Giữ state tạm của Form, trạng thái loading từng field.
-│ 
-└── schema/ & hooks/    # Khối 4: Nơi Lắp Ráp & Ứng Dụng
-                        # → 'schema/': Chứa cụ thể các file JSON (model.json, service.json).
-                        # → 'hooks/': Các Custom Hooks kết nối Engine (core) với React App hiện tại.
+```
+[ JSON Config ] → Layer 1: Network & Cache
+                → Layer 2: Schema Parser
+                → Layer 3: State & Rule Engine
+                → Layer 4: Rendering Engine
+                → Layer 5: Action Resolver → [ User Interaction ]
 ```
 
 ---
 
-## 5. Event/Action Handling (Case Study Thực tế)
+### Layer 1 — Network & Gateway
 
-Hệ thống CDUI dựa vào việc map Event người dùng (onClick, onChange) thành các chuỗi Action khai báo trong JSON.
+- **Mục tiêu:** Truy vấn và lấy Schema JSON từ Backend/CDN qua HTTP (GET).
+- **Xử lý lỗi:** Áp dụng cơ chế **Fail-fast**. Nếu fetch thất bại hoặc schema không tồn tại, hệ thống lập tức ngắt Pipeline và hiển thị Error State để tránh render data rác.
 
-### Case 1: Tương tác nhập liệu cơ bản (Simple Change)
-> **Tình huống:** User gõ vào một ô `TextInput` tên Asset.
+---
 
-- **Dòng chảy:** `onChange(value)` → dispatch action `SET_FIELD_VALUE` lên Redux.
-- **Render:** Redux Store cập nhật, ô Input `<NodeRenderer />` tương ứng re-render hiển thị chữ vừa gõ. Các phần khác của màn hình **đứng im**. Không cần Rule Engine.
+### Layer 2 — Schema Parser & Validator
 
-### Case 2: Ẩn hiện Field liên đới (Show/Hide Dependency)
-> **Tình huống:** Nếu user chọn `inputType="image"`, hệ thống mới cho hiện field `imageFormat`.
+**Mục tiêu:** Chuyển đổi và chuẩn hóa (Normalization) chuỗi JSON thô thành cấu trúc dữ liệu có cấu trúc (Typed Object). Đây là bộ lọc an ninh đảm bảo tính nhất quán của giao tiếp (Contract) giữa Backend và Rendering Engine.
 
-- JSON Config:
-  ```json
-  {
-    "id": "imageFormat",
-    "type": "select",
-    "showIf": { "===": [{ "var": "state.inputType" }, "image"] }
-  }
-  ```
-- **Dòng chảy:** User đổi select `inputType` → Redux nhận giá trị `"image"`.
-- Rule Engine "ngửi" thấy Redux vừa đổi, nó chọc vào evaluate cục `showIf` của biến `imageFormat` → Kết quả `=` `true`.
-- Engine cấp lệnh cho Node chứa `imageFormat` mount và hiển thị lên UI.
+**Nhiệm vụ cụ thể:**
 
-### Case 3: Kích hoạt tải dữ liệu liên đới (Fetch Data Trigger)
-> **Tình huống:** Chọn `Quốc gia` là Việt Nam, Dropdown `Tỉnh thành` lập tức gọi API tải danh sách theo "VN".
+- **Contract Enforcement:** Sử dụng **JSON Schema Validator(ex: AJV)** để xác thực cấu trúc chuẩn. Hệ thống sẽ ngay lập tức từ chối các phiên bản schema không tương thích, tránh runtime crash.
+- **Decomposition (Phân tách dữ liệu):** Phân rã tệp JSON tập trung thành các module dữ liệu riêng biệt:
+  - `layoutTree`: Cấu trúc cây giao diện cơ sở (topology). Các mảng `children` chỉ còn lưu tập hợp `id` của các node con.
+  - `fieldMap`: Cấu hình tĩnh gốc (type, label, options) của từng field, được trải phẳng (flatten) dưới dạng một từ điển (Key-Value) với key là `id` để tra cứu O(1).
+  - `initialState`: Gồm các giá trị mặc định (defaults) và metadata khởi tạo (blueprint) cho từng fieldId.
+  - `conditionMap`: Lưu trữ các biểu thức logic (`showIf`, `enableIf`) dưới dạng chuỗi có thể đánh giá (Evaluable).
+  - `validationMap`: Tập hợp các quy tắc kiểm tra tính hợp lệ (`required`, `pattern`, `custom`).
+  - `permissionMap`: Định nghĩa quyền truy cập (View/Edit) cho từng field, thường được trả về dựa trên Role của người dùng.
 
-- JSON Config:
-  ```json
-  {
-    "id": "province",
-    "type": "select",
-    "fetchOptions": {
-      "endpoint": "/api/provinces",
-      "params": { "country": "$state.country" },
-      "triggerOn": ["country"]
-    }
-  }
-  ```
-- **Dòng chảy:** Giá trị `country` thay đổi trên Redux. `ActionResolver` nhận diện đây là field nằm trong mảng `triggerOn` của `province`.
-- Nó trigger một side-effect (middleware) gọi API đến `/api/provinces?country=VN`.
-- Sau khi có kết quả, bắn tiếp lệnh `SET_OPTIONS` cập nhật Data Source thẳng vào Widget Select của `province`.
+**Design Note:** Layer 2 được thiết kế như một **Pure Function** — đảm bảo tính Idempotent (cùng input luôn cho cùng output).
 
-### Case 4: Logic Nghiệp vụ Phức tạp (Custom Hành vi)
-> **Tình huống:** Quy định siêu loằng ngoằng: "Nếu type là Model, Framework là TensorFlow, Dung lượng vượt 1GB → Ẩn nút Submit, bôi đỏ ô Type, cảnh báo dung lượng". Việc này viết bằng toán tử JSON rất ức chế và khó maintain.
+**Ví dụ — dự án Asset Management:**
 
-- Giải pháp là Engine nhường lại quyền kiểm soát, cho phép Developer viết Code thực thụ **(Quy tắc 80/20: JSON lo 80% case phổ thông, Code lo 20% cá biệt)**.
-- **Developer đăng ký Custom Action ở Frontend:**
-```typescript
-ActionResolver.register("VALIDATE_LARGE_TF_MODEL", (payload, dispatch, getState) => {
-  const { type, framework, size } = getState();
-  if (type === 'Model' && framework === 'TensorFlow' && size > 1_000_000) {
-    dispatch(disableNode("submitBtn"));
-    dispatch(showWarning("Cảnh báo dung lượng"));
-  }
-});
-```
-- Trên JSON chỉ cần khai báo "gọi":
-```json
-{ "events": { "onChange": [{ "action": "VALIDATE_LARGE_TF_MODEL" }] } }
-```
+Input — raw JSON từ Layer 1:
 
-### Case 5: Luồng Tác vụ Dây chuyền (Chain of Effects)
-> **Tình huống:** Khi bấm nút Submit → Validate Toàn bộ form → (Đúng) Gọi API Lưu → (Lưu xong) Về trang chủ.
-
-- Các Action khai báo trên JSON dưới dạng mảng **thực thi tuần tự**:
 ```json
 {
-  "events": {
-    "onClick": [
-      { "action": "VALIDATE_ALL" },
-      { "action": "API_CALL", "endpoint": "/assets", "method": "POST", "body": "$formData",
-        "onSuccess": [ { "action": "NAVIGATE", "url": "/home" } ],
-        "onError": [ { "action": "SHOW_TOAST", "message": "Failed to save" } ]
-      }
-    ]
+  "categories": [
+    {
+      "id": "asset_information",
+      "label": "Asset Information",
+      "subCategories": [
+        {
+          "id": "general",
+          "label": "General",
+          "fields": [
+            {
+              "id": "name",
+              "type": "input",
+              "label": "Name",
+              "required": true
+            },
+            {
+              "id": "summary",
+              "type": "textarea",
+              "label": "Summary",
+              "required": true
+            },
+            {
+              "id": "type",
+              "type": "select",
+              "label": "Type",
+              "required": true,
+              "options": ["Type A", "Type B", "Type C"]
+            },
+            {
+              "id": "tags",
+              "type": "input",
+              "label": "Tags",
+              "required": true
+            },
+            {
+              "id": "task",
+              "type": "select",
+              "label": "Task",
+              "required": true,
+              "showIf": {
+                "and": [
+                  { "!=": [{ "var": "type" }, null] },
+                  { ">": [{ "var": "tags.length" }, 0] }
+                ]
+              }
+            },
+            {
+              "id": "assetUrl",
+              "type": "input",
+              "label": "Asset URL",
+              "required": true
+            },
+            {
+              "id": "version",
+              "type": "input",
+              "label": "Version",
+              "required": true,
+              "fetchOptions": {
+                "endpoint": "/api/asset/version",
+                "params": { "url": "${assetUrl}" },
+                "triggerOn": ["assetUrl"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permission": {
+    "edit": {
+      "name": true,
+      "summary": true,
+      "type": true,
+      "tags": false,
+      "task": false,
+      "assetUrl": false,
+      "version": false
+    },
+    "view": {
+      "name": true,
+      "summary": true,
+      "type": true,
+      "tags": true,
+      "task": true,
+      "assetUrl": true,
+      "version": true
+    }
   }
 }
 ```
 
+Output — sau khi Layer 2 xử lý:
+
+```json
+{
+  "layoutTree": [
+    {
+      "id": "asset_information",
+      "type": "category",
+      "label": "Asset Information",
+      "children": [
+        {
+          "id": "general",
+          "type": "subCategory",
+          "label": "General",
+          "children": ["name", "summary", "type", "tags", "task", "assetUrl", "version"]
+        }
+      ]
+    }
+  ],
+  "fieldMap": {
+    "name": { "type": "input", "label": "Name" },
+    "summary": { "type": "textarea", "label": "Summary" },
+    "type": { "type": "select", "label": "Type", "options": ["Type A", "Type B", "Type C"] },
+    "tags": { "type": "input", "label": "Tags" },
+    "task": { "type": "select", "label": "Task" },
+    "assetUrl": { "type": "input", "label": "Asset URL" },
+    "version": { "type": "input", "label": "Version" }
+  },
+  "initialState": {
+    "name": null,
+    "summary": null,
+    "type": null,
+    "tags": [],
+    "task": null,
+    "assetUrl": null,
+    "version": null
+  },
+  "conditionMap": {
+    "task": {
+      "showIf": {
+        "and": [
+          { "!=": [{ "var": "type" }, null] },
+          { ">": [{ "var": "tags.length" }, 0] }
+        ]
+      }
+    },
+    "version": {
+      "fetchOptions": {
+        "endpoint": "/api/asset/version",
+        "params": { "url": "${assetUrl}" },
+        "triggerOn": ["assetUrl"]
+      }
+    }
+  },
+  "validationMap": {
+    "name": { "required": true },
+    "summary": { "required": true },
+    "type": { "required": true },
+    "task": {
+      "required": {
+        "and": [
+          { "!=": [{ "var": "type" }, null] },
+          { ">": [{ "var": "tags.length" }, 0] }
+        ]
+      }
+    },
+    "assetUrl": {
+      "required": true,
+      "rule": "url"
+    },
+    "version": { "required": true }
+  },
+  "permissionMap": {
+    "edit": {
+      "name": true,
+      "summary": true,
+      "type": true,
+      "tags": false,
+      "task": false,
+      "assetUrl": false,
+      "version": false
+    },
+    "view": {
+      "name": true,
+      "summary": true,
+      "type": true,
+      "tags": true,
+      "task": true,
+      "assetUrl": true,
+      "version": true
+    }
+  }
+}
+```
+
+- Layer 3 (Rule Engine) nhận `conditionMap` và `permissionMap` để kết hợp evaluate:
+  - logic (`showIf/ enableIf`) AND quyền (`view` + `edit`) → hiện/ẩn/enable field.
+  - `assetUrl` thay đổi → gọi API `version`.
+- Layer 4 chỉ đọc `layoutTree` (cấu trúc) và `fieldMap` (ui gốc) để vẽ, không biết gì về logic điều kiện hay phân quyền.
+
 ---
 
-## 6. Tối ưu Hiệu năng (Performance Deep Dive)
+### Layer 3 — State Management & Rule Engine
 
-Dựng Component tự động bằng đệ quy rất dễ chết yểu về performance. Hệ thống phải xử lý triệt để 4 vấn đề sau:
+**Mục tiêu:** Lưu trữ giá trị người dùng nhập vào và thực thi các quy tắc logic được định nghĩa trong schema (hiện/ẩn field, fetch data...).
 
-### Vấn đề 1: Form lớn nhập liệu bị "Cứng ngắc" (Over-rendering Component)
-- **Hiện trạng:** Form 50 fields, Redux lưu 1 cục cục bộ. Gõ 1 chữ vào ô "Tên", Redux dispatch → React hiểu state bị dơ → **Cả 50 fields bị đập đi vẽ lại** làm lag JS Thread.
-- **Giải pháp Cơ chế Node Binding (`reselect`):** Engine tạo Component bọc viền `<NodeRenderer id="fieldName" />`. Hàm bắt state `useSelector` của Redux dùng kèm `createSelector` để memoize. Khi Redux bắn tín hiệu, chỉ có Node của ô "Tên" thấy mẩu data nhỏ xíu của nó đổi. 49 thằng kia phát hiện data của mình không đổi, React áp dụng cơ chế `React.memo` (đứng im không tham gia quy trình vẽ).
-- *PoC:* Demo React DevTools Profiler tick "Highlight updates" - Khi gõ chữ, chỉ đúng vùng viền sát Input nháy xanh.
+**Cơ chế khởi tạo:** Layer này tiếp nhận `initialState` từ Layer 2 để thực hiện **Hydrate (Đổ dữ liệu)** vào Store. Tại thời điểm này, `formData` và `fieldMeta` chính thức được "sinh ra" trong bộ nhớ.
 
-### Vấn đề 2: Treo hình khi mới mở Trang (UI Thread Blocking)
-- **Hiện trạng:** Cấu hình JSON có 5,000 dòng. Parse toàn bộ 5,000 dòng đổ vào cây React ảo ngay Tích tắc đầu tiên làm trình duyệt đứng vài giây.
-- **Giải pháp Parse Từng Phần (Lazy Parse):** Giao diện phức tạp thường nằm trong Tabs / Accordions. Chỉ parse và mount đoạn JSON thuộc Tab mặc định ban đầu. Các nhánh còn lại đánh dấu `isSuspended=true`, khi User click mở tab số 2, Parser mới duyệt tiếp cục Config của Tab 2.
-- *PoC:* So sánh chỉ số Time to Interactive (TTI) của Lighthouse giữa lúc render toàn cây vs lúc render từng tab.
+**Hai thành phần:**
 
-### Vấn đề 3: Thời gian đợi cục Config (Network Letency)
-- **Hiện trạng:** Người dùng bấm "F5" dính màn hình chờ xoay quay vì phải đợi fetch file JSON, dù form đó vẫn y ngày hôm qua.
-- **Giải pháp HTTP ETag & Local Caching:** Backend cấu hình trả mã băm ETag đính lên Header file JSON. Ở lần gọi thứ 2, Frontend hỏi: *"Lấy file có mã XYZ nè, ổng đổi chưa?"*. Backend phán: *"Chưa đổi" (Mã 304 Not Modified)*. API Payload lúc này mất **0 bytes** truyền mạng, Client khựi file từ ổ cứng lên xài không độ trễ.
+- **Redux Store** — lưu 2 loại dữ liệu tách biệt:
+  - `formData`: Lưu giá trị (value) — ví dụ:
+    ```json
+    {
+      "name": "Asset A",
+      "type": "Type A",
+      "tags": ["Urgent", "Internal"]
+    }
+    ```
+  - `fieldMeta`: Lưu metadata của field — là 1 Map với key = `id` của field:
+    ```json
+    {
+      "name": {
+        "visible": true,
+        "disabled": false,
+        "error": null
+      },
+      "task": {
+        "visible": true,
+        "disabled": false,
+        "loading": false
+      },
+      "version": {
+        "visible": true,
+        "loading": true,
+        "options": []
+      }
+    }
+    ```
 
-### Vấn đề 4: Tải "rác" không dùng (Bundle Bloat)
-- **Hiện trạng:** `ComponentRegistry` có sẵn các "món ăn chơi" hạng nặng (Map Viewer, Video Player, Code Editor). Kéo theo Chunk JS khổng lồ.
-- **Giải pháp Bundle Code-Splitting (`React.lazy`):** Trong kho Registry chỉ chứa Function Factory chỉ đường: `{ "video": React.lazy(() => import('./VideoWidget')) }`. Parser quét toàn bộ file JSON không thấy tag `"video"` nào. Chunk JS của Video không bao giờ được Network tải xuống cho đến khi có một Form Asset nào đó cần cấu hình nó.
+- **Rule Engine (ex: JsonLogic lib)** — đọc `conditionMap`, `validationMap` và `permissionMap` từ Layer 2, lắng nghe `formData` thay đổi, tính lại các flag (`visible`, `disabled`, `error`...) và cập nhật vào `fieldMeta`.
+
+**Cơ chế Validation (Kiểm tra dữ liệu):**
+
+Validation là trách nhiệm của Layer 3, được trigger khi người dùng tương tác (onChange/onBlur) hoặc khi Submit form. Luồng xử lý như sau:
+
+1. **Permission Check:** Nếu field KHÔNG có quyền edit (chỉ view) -> Bỏ qua validate.
+2. **Rule Evaluation:** Layer 3 đối chiếu `formData` hiện tại với `validationMap`:
+   - **Required cơ bản (`name`, `summary`):** Báo lỗi nếu thiếu data. Khi submit, nếu gom lại có lỗi -> Toast "Please fill all information."
+   - **Dependent Validation (`task`):** Cờ `required` của `task` không phải là boolean cứng, mà là biểu thức động (chỉ required khi `tags` có data và `type` có data).
+   - **Named Rule Validation (`assetUrl`):** Thay vì bắt thiết kế viên (những người không nắm rõ Regex) viết một đoạn regex khổng lồ vào JSON, Layer 2 chỉ cần định nghĩa định danh `"rule": "url"`. Layer 3 lúc này chứa một **Validation Registry** (tập hợp các hàm map cứng ở Frontend như `isValidUrl`, `isValidEmail`...). Rule Engine phát hiện key "url" sẽ lấy hàm `isValidUrl` ra chạy (bên trong hàm FE đã gom cả Regex check link, ipv4, ipv6...).
+3. **Kết quả:** Nếu có lỗi, Layer 3 cập nhật `fieldMeta[fieldName].error = "Error string"`. NodeRenderer (Layer 4) nghe thấy biến `error` thay đổi sẽ lập tức vẽ viền đỏ cho trường đó.
+
+**Ví dụ — tiếp nối dự án Asset Management:**
+
+| Sự kiện                               | Rule Engine xử lý                            | Kết quả ghi vào `fieldMeta`                  |
+| ------------------------------------- | -------------------------------------------- | -------------------------------------------- |
+| Chọn `type` AND nhập ít nhất 1 `tags` | `showIf` = true AND `permission.view` = true | `fieldMeta.task.visible = true`              |
+| User muốn sửa field `tags`            | `permission.edit.tags` = false               | `fieldMeta.tags.disabled = true`             |
+| User nhập `assetUrl`                  | Detect `version.triggerOn` → fetch API       | `fieldMeta.version.options` = kết quả trả về |
 
 ---
 
-## 7. Chiến lược Kiểm thử (Testing Strategy)
+### Layer 4 — Rendering Engine
 
-Việc áp dụng Jest & React Testing Library (RTL) sẽ được chia lớp ngang, thay vì test mù:
+**Mục tiêu:** Ánh xạ cấu hình logic (`layoutTree`) thành giao diện người dùng thực tế thông qua React Components. Đảm bảo tính trung thực tuyệt đối giữa định nghĩa Schema và UI hiển thị.
 
-| Mảng Test | Output cần đảm bảo | Tool Test đề xuất |
-|---|---|---|
-| **Schema Validation** | Chặn lại và báo lỗi cấu trúc ngay nếu Config JSON viết sai (thiếu id, sai type field). | Unit Test (**Jest** vs Data gốc) |
-| **Logic & Rule Engine** | Evaluate chính xác các hàm nhúng jsonLogic lớn nhó (`>`, `<`, `in`, `==`) qua mọi edge cases. | Unit Test Mảng bảng (**Jest**) |
-| **State Reduction** | `cdaSlice` reducer xử lý data (mảng/object sâu) không bị sai reference. | Unit Test (**Jest**) |
-| **Widget UI Render** | Một Node TextInput render đúng class, màu, thuộc tính nhận từ Props config mẫu. | Component Snapshot (**RTL**) |
-| **Node Resolver Engine** | Bơm 1 Config đơn giản gồm: "Input rỗng -> Ấn lỗi". RTL click vào nút, Check xem store báo lỗi ko. | Integration Mạch dọc (**RTL**) |
-| **DOM Perf Benchmark** | Ép hàm loop tạo mock JSON 200 nodes, kiểm tra render duration có <= ~100ms. | React Test Profiler API / Playwright |
+**Cơ chế vận hành:**
 
----
+- **Recursive Traversal:** Duyệt cây cấu hình theo chiều sâu (Depth-first). Áp dụng mẫu thiết kế **Factory Pattern** thông qua `ComponentRegistry` để chuyển đổi định danh `type` thành `React.Component` tương ứng.
+- **Nodes Orchestration:** Mỗi thành phần được bao bọc bởi `<NodeRenderer id="..." />`. Lớp này đảm nhận:
+  - Tra cứu `fieldMap[id]` để biết cấu hình hiển thị tĩnh (vd: Component này là Textarea hay Dropdown, label là gì).
+  - Kết nối dữ liệu từ Store (`formData`, `fieldMeta`),
+  - Quản lý vòng đời hiển thị (Mount/Redraw),
+- **Extensibility (Khả năng mở rộng):** Cho phép lập trình viên tự tạo và "cắm" thêm các component đặc thù (Custom Widgets) vào hệ thống mà không phải sửa code lõi của form.
+  - **Ví dụ:** Mặc định hệ thống hỗ trợ các loại `type` cơ bản (`input`, `select`...). Nhưng nếu dự án Asset cần một trường đính kèm bản đồ tọa độ (`{"type": "location_picker"}`), ta chỉ việc viết một component `<LocationPicker />` riêng rồi "đăng ký" (Registry) vào Rendering Engine để nó tự gọi ra khi gặp.
 
-## 8. Lộ trình Triển khai (Strangler Migration Pattern)
-
-Không xoá code cũ đập đi xây lại cái mới để tránh rủi ro vỡ luồng kinh doanh (Big Bang). Thay vì vậy, ta bóp nghẹt hệ thống cũ từ từ:
-
-- **Giai đoạn 0 (Audit & POC):** Phân tích Form quản lý Model Asset (đang nhức nhối nhất), list ra các type component. Tạo 1 file `model.json` mô phỏng bằng tay trên giấy.
-- **Giai đoạn 1 (Foundation):** Đội ngũ Frontend Architect dựng Khối 1 (core engine) và 5 Fields cơ bản nhất (Text, ID, Select, Button, Container). Cắm Redux Store và chạy qua test nội bộ.
-- **Giai đoạn 2 (A/B Pilot):** Đưa Form Model của CDA vào chạy song song. Phân quyền cho một vài User Pilot test tính linh hoạt, còn các form Asset khác (Dataset, Agent) vẫn là form hard-code cũ.
-- **Giai đoạn 3 (Scale Out):** Bơm dần các Widget đặc thù (TagsInput, DateRange). Migrate cuốn chiếu các form Asset còn lại bằng cách dịch chúng sang JSON.
-- **Giai đoạn 4 (Clean up):** Khi file JSON cuối cùng hoạt động, dọn dẹp nhổ bỏ toàn bộ hàng chục ngàn dòng code Form hardcode ở repo cũ để lấy lại Performance cho Web app.
+**Isolation Principle:** Rendering Engine được thiết kế như một **Presentation Layer** thuần túy: Tiếp nhận State để hiển thị, tuyệt đối không can thiệp vào Business Logic hoặc trực tiếp thao tác dữ liệu.
 
 ---
 
-## 9. Đề xuất Tăng cường Hệ thống (Cơ chế Fallback - Graceful Degradation)
+### Layer 5 — Action Resolver
 
-**Vấn đề:** Sau khi triển khai xong, một ngày nọ Backend tự ý deploy file JSON cho Form mới, chèn vào một Component tên là `type="3D_Viewer"`. Frontend team 2 ngày sau mới làm cái này. Lúc này Production Website bị Frontend ném Error sập trắng trang (White Screen of Death).
+**Mục tiêu:** Xử lý các sự kiện (click, change) từ UI và biến chúng thành các hành động cụ thể (gọi API, cập nhật Redux...).
 
-**Giải pháp (Kiến trúc An toàn):**
-1. **Bọc Lưới An Toàn (Error Boundaries):** Động cơ duyệt cây của Frontend luôn được bọc trong bộ lọc. Lúc đi tìm hàm `3D_Viewer` trong Kho mà hàm rỗng (Lookup Failed), hệ thống không sập. 
-2. **Hiển thị Thay thế Kín đáo:** Nó lặng lẽ in ra một khối UI mặc định: *"Tính năng này yêu cầu cập nhật"* (ẩn với End-user, chỉ báo vàng với tài khoản Admin). Render engine vẫn bình tĩnh vẽ tiếp các Input Text, Button kế dưới nó.
-3. **Cảnh báo (Telemetry Log):** Hệ thống Lớp 5 Action âm thầm gửi 1 chuỗi log về Chatbot Telegram/Slack của Tech Lead: *"(Warning): Client Ver 1.4 vừa fetch phải Widget `3D_Viewer` nhưng Registry không có."* Team có ngay chỉ định task cần code bổ sung vào Frontend.
+**Ba chức năng:**
+
+1. **Dịch sự kiện (Event Translation):** Component UI chỉ làm nhiệm vụ "báo cáo" (VD: "Nút Submit vừa bị click"). Layer 5 sẽ đọc JSON để xem "Khi click thì phải làm gì?" và thực thi lệnh đó.
+2. **Chuỗi hành động (Execution Pipeline):** Code JSON có thể cấu hình nối tiếp nhiều hành động. VD: Gọi API lưu data → Thành công thì chuyển trang, Thất bại thì hiện thông báo lỗi.
+3. **Hành động tuỳ chỉnh (Custom Actions):** Ngoài các lệnh có sẵn như (`SET_FIELD_VALUE` hay `API_CALL`), bạn có thể tự viết thêm các hàm JS (Custom Action) để xử lý các nghiệp vụ quá phức tạp không thể viết bằng JSON.
+
+> **Layer 3 vs Layer 5:**
+>
+> - **Layer 5 (Action Resolver)** chỉ xử lý các "Hành động chủ động" từ người dùng (User Interactions) như bấm nút Submit, bấm nút Delete, click Link chuyển trang.
+> - **Layer 3 (Rule Engine)** lo phần "Logic phản ứng ngầm" (Reactive Logic). Ví dụ: việc _gõ vào field A làm hiện field B_, hay _chọn Dropdown C thì tự động Call API điền vào field D_. Những logic này được config trong schema (`conditionMap`) và do Layer 3 tự động kích hoạt khi value thay đổi, Layer 5 **không** can thiệp.
+
+**Reference:** Đóng vai trò tương đương `DivActionHandler` trong DivKit, đảm nhiệm việc trung hòa (Intercept) các Layout Events trước khi phân phối về các dịch vụ xử lý.
+
+---
+
+> **Architectural Reference — DivKit (Yandex):** Hệ thống SDUI production-scale open-source, kiến trúc module hóa tương ứng trực tiếp với 5-layer pipeline:
+>
+> | Layer                      | DivKit Module           | Chức năng                            |
+> | -------------------------- | ----------------------- | ------------------------------------ |
+> | Layer 2 — Schema Parser    | `div-json` + `div-data` | Deserialize JSON → typed `DivData`   |
+> | Layer 3 — Rule Engine      | `div-evaluable`         | Expression evaluation engine         |
+> | Layer 4 — Rendering Engine | `div-core` / `Div2View` | Layout tree traversal + View binding |
+> | Layer 5 — Action Resolver  | `DivActionHandler`      | Event interception + dispatch        |
+>
+> Widget extensions (`div-video`, `div-lottie`) được inject vào `DivConfiguration` — cùng pattern với `ComponentRegistry` trong thiết kế này.
+
+---
+
+## 4. Module Structure
+
+Codebase được tổ chức theo **functional boundaries**, phản ánh trực tiếp 5 layers của pipeline. Ranh giới module được giữ cứng để tránh coupling ngoài ý muốn.
+
+```
+src/
+├── core/               # Engine layer — framework-agnostic, zero business logic
+│   ├── network/        # Layer 1: Fetch + ETag cache strategy
+│   ├── parser/         # Layer 2: AJV validation + schema decomposition
+│   ├── evaluator/      # Layer 3 (Rule Engine): JsonLogic expression evaluator
+│   ├── engine/         # Layer 4: Recursive renderer + NodeRenderer
+│   ├── registry/       # Layer 4: ComponentRegistry + ActionRegistry
+│   └── actions/        # Layer 5: Built-in action handlers
+│
+├── store/              # Layer 3 (State): Redux slice, selectors, middleware
+│   └── cdaSlice.ts     # formData · fieldMeta · loadingFields
+│
+├── widgets/            # Presentational components — pure, no side effects
+│   ├── core/           # TextInput, Select, Checkbox, DatePicker...
+│   ├── layout/         # Container, Row, Column, Divider...
+│   └── custom/         # Project-specific widgets (TagInput, AssetPreview...)
+│
+├── schema/             # JSON config files per Asset type
+│   ├── model.json
+│   ├── dataset.json
+│   └── service.json
+│
+└── hooks/              # Integration layer — connect engine to React app
+    ├── useCdaScreen.ts # Orchestrate fetch → parse → render lifecycle
+    └── useAction.ts    # Bridge between widget events and Action Resolver
+```
+
+**Dependency rule:** `core/` không import từ `store/`, `widgets/`, hoặc `schema/`. `widgets/` không import từ `store/`. Dependency chỉ chạy từ ngoài vào trong, không ngược lại.
+
+---
+
+## 5. Event, Effect & Action Handling
+
+Tất cả user interaction đều đi qua Action Resolver theo pattern: **Event → Action Descriptor → Handler → State / Side Effect**.
+
+### Case 1: Simple Field Update
+
+Scenario đơn giản nhất — user nhập liệu vào một trường độc lập.
+
+**Flow:** `onChange(value)` → `ActionResolver.dispatch({ action: "SET_FIELD_VALUE", fieldId, value })` → Redux `formData` update → chỉ `NodeRenderer` của field đó re-render (nhờ Reselect selector).
+
+Không có Rule Engine involvement. Layer 3 chỉ ghi nhận state mới.
+
+---
+
+### Case 2: Conditional Visibility (Show/Hide Dependency)
+
+Field visibility được điều khiển bởi giá trị của field khác.
+
+**Schema contract:**
+
+```json
+{
+  "id": "imageFormat",
+  "type": "select",
+  "showIf": { "===": [{ "var": "inputType" }, "image"] }
+}
+```
+
+**Flow:** `inputType` thay đổi → Redux update → Rule Engine re-evaluate `showIf` expression → ghi kết quả vào `fieldMeta.imageFormat.visible` → `NodeRenderer` của `imageFormat` đọc flag và mount/unmount.
+
+Rule Engine là observer của Redux store — reactive, không polling.
+
+---
+
+### Case 3: Cross-field Data Dependency (Cascading Fetch)
+
+Field B cần fetch options từ API dựa trên giá trị hiện tại của Field A.
+
+**Schema contract:**
+
+```json
+{
+  "id": "province",
+  "type": "select",
+  "fetchOptions": {
+    "endpoint": "/api/provinces",
+    "params": { "country": "${country}" },
+    "triggerOn": ["country"]
+  }
+}
+```
+
+**Flow:** `country` thay đổi → Action Resolver phát hiện `country` nằm trong `triggerOn` của `province` → dispatch `FETCH_OPTIONS(province)` → gọi API với runtime param interpolation → kết quả ghi vào `fieldMeta.province.options` → Select widget re-render với options mới.
+
+---
+
+### Case 4: Complex Business Logic — Custom Action Handler
+
+Một số business rule không thể biểu diễn đầy đủ trong JSON schema do độ phức tạp của điều kiện hoặc tác động đa chiều. Engine cung cấp **Custom Action extension point**.
+
+**Nguyên tắc 80/20:** Schema JSON xử lý ~80% interaction flows thông thường. 20% business-specific logic được delegate sang imperative handlers đăng ký tại application layer.
+
+**Handler registration:**
+
+```typescript
+ActionResolver.register(
+  "VALIDATE_ASSET_CONSTRAINTS",
+  (payload, { dispatch, getState }) => {
+    const { assetType, framework, storageSize } = getState().formData;
+    if (
+      assetType === "Model" &&
+      framework === "TensorFlow" &&
+      storageSize > 1_000_000
+    ) {
+      dispatch(setFieldMeta("submitBtn", { disabled: true }));
+      dispatch(
+        setFieldMeta("storageSize", {
+          error: "Exceeds limit for TensorFlow models",
+        }),
+      );
+    }
+  },
+);
+```
+
+**Schema declaration:**
+
+```json
+{ "events": { "onChange": [{ "action": "VALIDATE_ASSET_CONSTRAINTS" }] } }
+```
+
+Schema chỉ khai báo trigger — implementation nằm hoàn toàn trong codebase, có thể type-safe, testable, và versioned qua git.
+
+---
+
+## 6. Performance Considerations
+
+Kiến trúc CDA/SDUI dựa trên mô hình rendering đệ quy và quản lý trạng thái tập trung, do đó cần giải quyết triệt để các rủi ro về hiệu năng sau:
+
+### 6.1. Kiểm soát Over-rendering trong quá trình nhập liệu
+
+- **Rủi ro:** Cập nhật Redux state thường xuyên khi user nhập liệu có thể kích hoạt quy trình re-render toàn bộ cây component (subtree dirty marking). Đối với form lớn (100+ fields), điều này gây hiện tượng input lag.
+- **Giải pháp - Node Binding:** Áp dụng `createSelector` (Reselect) tại mỗi `NodeRenderer` để đảm bảo component chỉ subscribe đúng mảnh state tương ứng. Kết hợp `React.memo` để triệt tiêu việc re-render các node không có thay đổi dữ liệu.
+- **Kiểm chứng (PoC):** Sử dụng React DevTools Profiler ("Highlight updates") để xác nhận chỉ duy nhất node đang thao tác thực hiện quy trình render.
+
+### 6.2. Giảm thiểu UI Thread Blocking khi khởi tạo Form
+
+- **Rủi ro:** Việc thực hiện Parse và Mount đồng loạt hàng trăm fields cùng lúc chiếm dụng JS Main Thread, gây hiện tượng "đơ" UI hoặc màn hình trắng trong thời gian dài.
+- **Giải pháp:**
+  - **A. Field Virtualization:** Sử dụng `@tanstack/react-virtual` để chỉ duy trì trong DOM các fields thuộc khung nhìn (viewport). Hệ thống chỉ mount các nodes mới khi user thực hiện thao tác cuộn.
+  - **B. Deferred Rendering:** Sử dụng `React.startTransition` để tách biệt quá trình render form khỏi luồng cập nhật UI ưu tiên cao (như animation hoặc skeleton).
+- **Kiểm chứng (PoC):** Đo lường chỉ số TTI (Time to Interactive) trên Lighthouse; mục tiêu duy trì ngưỡng < 200ms cho form quy mô lớn.
+
+### 6.3. Tối ưu hóa Network Latency & Băng thông (ETag Mechanism)
+
+- **Rủi ro:** Các file JSON cấu hình có dung lượng lớn, việc tải lại schema trong mỗi session làm tăng độ trễ và tải trọng lên hệ thống network.
+- **Giải pháp - ETag Validation:**
+  1. **Handshake:** Client gửi yêu cầu kèm header `If-None-Match: [ETag_Hash]` đã lưu từ session trước.
+  2. **Verification:** Server so khớp mã băm của file hiện tại với mã client gửi lên. Nếu trùng khớp, server phản hồi mã **304 Not Modified** với thân bài rỗng (**0 bytes payload**).
+  3. **Hydration:** Client nhận mã 304 và ngay lập tức lấy dữ liệu từ LocalStorage để hiển thị UI, loại bỏ hoàn toàn thời gian chờ tải dữ liệu.
+- **Kiểm chứng (PoC):** Network tab hiển thị mã `304` với kích thước payload tối thiểu cho các lần truy cập lặp lại.
+
+### 6.4. Kiểm soát kích thước Bundle chính (Bundle Bloat)
+
+- **Rủi ro:** Việc đăng ký toàn bộ UI Widgets vào `ComponentRegistry` theo cách tĩnh sẽ kéo theo tất cả mã nguồn (bao gồm cả các widget nặng như RichText, Charts) vào bundle chính.
+- **Giải pháp - Code Splitting:** Đăng ký widget dưới dạng các **Lazy Factory** sử dụng `React.lazy()`. Schema Parser sẽ chỉ kích hoạt việc tải JS chunk của một widget cụ thể khi gặp định nghĩa `type` tương ứng trong tệp JSON.
+- **Kiểm chứng (PoC):** Sử dụng Bundle Analyzer để xác nhận các widget nặng được tách ra thành các async chunks độc lập.
+
+---
+
+## 7. Testing Strategy
+
+Test coverage được tổ chức theo layer boundary, đảm bảo mỗi layer có thể được verify độc lập.
+
+| Layer                      | Coverage Target                                                        | Approach                                      |
+| -------------------------- | ---------------------------------------------------------------------- | --------------------------------------------- |
+| **Schema Validation**      | Toàn bộ required fields, type constraints, unknown properties          | AJV schema test với valid/invalid fixtures    |
+| **Rule Engine**            | Tất cả expression operators, edge cases (null, undefined, empty array) | Parameterized unit tests (Jest `test.each`)   |
+| **NodeRenderer**           | Render đúng component type, áp dụng đúng props từ schema               | RTL component test với mock registry          |
+| **Action Resolver**        | Mỗi built-in action type → đúng Redux dispatch hoặc side effect        | Jest với mock store và spies                  |
+| **Integration Flow**       | Schema → Parse → Render → User interaction → State update              | RTL + MSW (Mock Service Worker) cho API calls |
+| **Performance Regression** | Render time không vượt threshold khi schema size tăng                  | React Profiler API trong test environment     |
+
+---
+
+## 8. Migration Roadmap — Strangler Fig Pattern
+
+Migration thực hiện theo chiến lược **Strangler Fig** — hệ thống mới được xây dựng song song, dần thay thế hệ thống cũ theo từng vertical slice, không có big-bang cutover.
+
+| Phase                     | Scope                                                                                                            | Success Criteria                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Phase 0 — Audit**       | Inventory tất cả Asset form fields hiện tại, phân loại field types, xác định custom logic                        | Schema taxonomy document, field coverage matrix                                 |
+| **Phase 1 — Core Engine** | Implement 5-layer pipeline, 6 widget primitives (Text, Select, Checkbox, Number, Container, Button), Redux slice | Engine chạy ổn định với 3 schema fixtures, test coverage ≥ 80%                  |
+| **Phase 2 — Pilot**       | Migrate 1 Asset form (Model) sang CDA, chạy song song với implementation cũ qua feature flag                     | Zero regression trên E2E test suite, performance parity                         |
+| **Phase 3 — Rollout**     | Migrate các Asset form còn lại (Dataset, Service, Agent), bổ sung custom widgets                                 | Full Asset type coverage, không còn hard-coded form components                  |
+| **Phase 4 — Cleanup**     | Xóa legacy form components, remove feature flags, tối ưu bundle                                                  | Bundle size giảm, codebase complexity giảm đo bằng LOC và cyclomatic complexity |
+
+---
+
+## 9. Graceful Degradation — Fallback Architecture
+
+Một rủi ro đặc thù của SDUI: khi schema tham chiếu đến một `type` chưa được đăng ký trong `ComponentRegistry` — xảy ra khi backend deploy schema mới trước khi frontend được cập nhật.
+
+**Cơ chế xử lý:**
+
+1. **ErrorBoundary at NodeRenderer level:** Mỗi `NodeRenderer` được bọc bởi React `ErrorBoundary`. Khi registry lookup fail, boundary catch lỗi và render `UnknownWidgetPlaceholder` — form tiếp tục hoạt động bình thường với các node còn lại.
+
+2. **Role-based visibility:** `UnknownWidgetPlaceholder` hiển thị warning chi tiết với Admin/Developer role; ẩn hoàn toàn với end-user.
+
+3. **Telemetry on unknown type:** Action Resolver tự động dispatch log event khi gặp unresolvable type — payload bao gồm component type, client version, schema version. Cho phép team định lượng frequency và ưu tiên implementation.
+
+**Kết quả:** Không có white screen of death do schema/client version mismatch.
+
+---
+
+## References
+
+| Source                                                                                             | Relevance                                                                                                                       |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **DivKit (Yandex)** — [github.com/divkit/divkit](https://github.com/divkit/divkit)                 | Primary architectural reference. `div-json → div-evaluable → div-core → DivActionHandler` pipeline là basis của 5-layer design. |
+| **Airbnb Ghost Platform** — [medium.com/airbnb-engineering](https://medium.com/airbnb-engineering) | SDUI tại production scale — lessons learned về schema versioning và client compatibility.                                       |
+| **Shopify SDUI** — [shopify.engineering](https://shopify.engineering)                              | Real-time UI control không qua App Store cycle — motivation cho định hướng SDUI dài hạn.                                        |
+| **JsonLogic** — [jsonlogic.com](https://jsonlogic.com)                                             | JSON-serializable, eval-free expression language cho Rule Engine.                                                               |
+| **Formily (Alibaba)** — [formilyjs.org](https://formilyjs.org)                                     | Reactive form model với fine-grained reactivity — reference cho Layer 3 design.                                                 |

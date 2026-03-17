@@ -1,0 +1,91 @@
+---
+id: 5a5c1ac7-0e97-40b1-a301-7674695a3c72
+---
+flowchart TD
+    %% Styling
+    classDef l1 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+    classDef l2 fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#e65100
+    classDef l3 fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px,color:#4a148c
+    classDef l4 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+    classDef l5 fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#b71c1c
+    classDef ext fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#263238
+
+    Backend[(Backend API\n& Permission DB)]:::ext
+    User((User)):::ext
+
+    %% Layer 1
+    subgraph Layer1 [Layer 1: Network & Gateway]
+        Fetcher["HTTP Client\n(Axios/Fetch)"]:::l1
+        Cache[ETag Cache\nMechanism]:::l1
+        ErrorBoundary[Fail-fast\nError Handler]:::l1
+    end
+
+    %% Layer 2
+    subgraph Layer2 [Layer 2: Schema Parser & Validator]
+        Validator["JSON Validator\n(AJV)"]:::l2
+        Decomposer[Decomposer / Splitter]:::l2
+    end
+
+    %% Layer 3
+    subgraph Layer3 [Layer 3: State Management & Rule Engine]
+        Store[(Redux Store)]:::l3
+        formData["formData\n(Giá trị nhập)"]:::l3
+        fieldMeta["fieldMeta\n(visible, disabled, error)"]:::l3
+        RuleEngine["Rule Engine\n(JsonLogic)"]:::l3
+        PermissionResolver[Permission\nResolver]:::l3
+    end
+
+    %% Layer 4
+    subgraph Layer4 [Layer 4: Rendering Engine]
+        TreeWalker[TreeWalker & Orchestrator]:::l4
+        Registry["Component Registry\n(Input, Dropdown, Textarea...)"]:::l4
+        NodeRenderer["NodeRenderer\n(Kết nối Redux)"]:::l4
+        UI[React Virtualized UI]:::l4
+    end
+
+    %% Layer 5
+    subgraph Layer5 [Layer 5: Action Resolver]
+        Translator["Event Translator\n(onClick, onChange)"]:::l5
+        Pipeline["Execution Pipeline\n(Sync/Async Chaining)"]:::l5
+    end
+
+    %% --- Connections ---
+
+    %% Layer 1 Flow
+    Backend -->|JSON Payload + ETag| Fetcher
+    Fetcher <-->|Verify Version| Cache
+    Fetcher -->|Schema lỗi, mất mạng| ErrorBoundary
+    Fetcher -->|Raw JSON| Validator
+    
+    %% Layer 2 Flow
+    Validator -->|Hợp lệ| Decomposer
+    
+    %% Layer 2 to Layer 3, 4, 5 outputs
+    Decomposer -.->|1. layoutTree| TreeWalker
+    Decomposer -.->|2. initialState| formData
+    Decomposer -.->|3. conditionMap| RuleEngine
+    Decomposer -.->|4. permissionMap| PermissionResolver
+    Decomposer -.->|5. actions config| Translator
+
+    %% Layer 3 Internal Flow
+    Store --- formData
+    Store --- fieldMeta
+    formData -->|Trigger khi value đổi| RuleEngine
+    PermissionResolver -->|Quyền Edit/View| RuleEngine
+    RuleEngine -->|Ghi đè thuộc tính| fieldMeta
+
+    %% Layer 4 Rendering Flow
+    TreeWalker -->|Tạo node theo Tree| NodeRenderer
+    NodeRenderer -. Lắng nghe (Subscribe) .-> fieldMeta
+    NodeRenderer -. Lắng nghe (Subscribe) .-> formData
+    NodeRenderer -->|Inject Component| Registry
+    Registry --> UI
+
+    %% User interaction -> Layer 5
+    User <==>|Tương tác| UI
+    UI -->|Emit Event| Translator
+    Translator -->|Match Action| Pipeline
+
+    %% Layer 5 feedbacks
+    Pipeline -->|Call API| Backend
+    Pipeline -->|Update Value| formData
