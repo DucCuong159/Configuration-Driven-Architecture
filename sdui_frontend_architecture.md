@@ -338,6 +338,22 @@ Validation là trách nhiệm của Layer 3, được trigger khi người dùng
 - **Extensibility (Khả năng mở rộng):** Cho phép lập trình viên tự tạo và "cắm" thêm các component đặc thù (Custom Widgets) vào hệ thống mà không phải sửa code lõi của form.
   - **Ví dụ:** Mặc định hệ thống hỗ trợ các loại `type` cơ bản (`input`, `select`...). Nhưng nếu dự án Asset cần một trường đính kèm bản đồ tọa độ (`{"type": "location_picker"}`), ta chỉ việc viết một component `<LocationPicker />` riêng rồi "đăng ký" (Registry) vào Rendering Engine để nó tự gọi ra khi gặp.
 
+**Làm sao để biết một `type` (VD: `input`) có những thuộc tính (properties) gì?**
+Đây là bài toán cốt lõi của SDUI được giải quyết bằng khái niệm **Schema Contract (Giao kèo tập trung)**:
+1. **Đối với Frontend:** Mỗi Widget bắt buộc phải định nghĩa một Interface/Type rõ ràng bằng TypeScript.
+   ```typescript
+   // src/widgets/core/InputWidget.tsx
+   export interface InputWidgetProps {
+     id: string;
+     label: string;
+     placeholder?: string;
+     disabled?: boolean;
+     maxLength?: number;  // Thuộc tính riêng của type "input"
+     type: "text" | "password" | "number";
+   }
+   ```
+2. **Đối với Backend / Người thiết kế Form:** Toàn bộ các Frontend Interfaces ở trên sẽ được biên dịch (generate) thành một tài liệu **JSON Schema (Draft-07/04)**. Người thiết kế form sẽ dựa vào tài liệu này (hoặc JSON Schema tích hợp thẳng vào VSCode/Swagger) để cấu hình. Nếu họ gõ sai tên thuộc tính (VD: gõ `max_length` thay vì `maxLength`), **Layer 2** (với thư viện AJV) sẽ báo lỗi từ chối render ngay lập tức.
+
 **Isolation Principle:** Rendering Engine được thiết kế như một **Presentation Layer** thuần túy: Tiếp nhận State để hiển thị, tuyệt đối không can thiệp vào Business Logic hoặc trực tiếp thao tác dữ liệu.
 
 ---
